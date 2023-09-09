@@ -1,11 +1,11 @@
 import { INode, INodeData, INodeParams } from '../../../src/Interface'
 import { TextSplitter } from 'langchain/text_splitter'
 import { JSONLoader } from 'langchain/document_loaders/fs/json'
-import { getBlob } from '../../../src/utils'
 
 class Json_DocumentLoaders implements INode {
     label: string
     name: string
+    version: number
     description: string
     type: string
     icon: string
@@ -16,6 +16,7 @@ class Json_DocumentLoaders implements INode {
     constructor() {
         this.label = 'Json File'
         this.name = 'jsonFile'
+        this.version = 1.0
         this.type = 'Document'
         this.icon = 'json.svg'
         this.category = 'Document Loaders'
@@ -64,20 +65,35 @@ class Json_DocumentLoaders implements INode {
             pointers = outputString.split(',').map((pointer) => '/' + pointer.trim())
         }
 
-        const blob = new Blob(getBlob(jsonFileBase64))
-        const loader = new JSONLoader(blob, pointers.length != 0 ? pointers : undefined)
-        let docs = []
+        let alldocs = []
+        let files: string[] = []
 
-        if (textSplitter) {
-            docs = await loader.loadAndSplit(textSplitter)
+        if (jsonFileBase64.startsWith('[') && jsonFileBase64.endsWith(']')) {
+            files = JSON.parse(jsonFileBase64)
         } else {
-            docs = await loader.load()
+            files = [jsonFileBase64]
+        }
+
+        for (const file of files) {
+            const splitDataURI = file.split(',')
+            splitDataURI.pop()
+            const bf = Buffer.from(splitDataURI.pop() || '', 'base64')
+            const blob = new Blob([bf])
+            const loader = new JSONLoader(blob, pointers.length != 0 ? pointers : undefined)
+
+            if (textSplitter) {
+                const docs = await loader.loadAndSplit(textSplitter)
+                alldocs.push(...docs)
+            } else {
+                const docs = await loader.load()
+                alldocs.push(...docs)
+            }
         }
 
         if (metadata) {
             const parsedMetadata = typeof metadata === 'object' ? metadata : JSON.parse(metadata)
             let finaldocs = []
-            for (const doc of docs) {
+            for (const doc of alldocs) {
                 const newdoc = {
                     ...doc,
                     metadata: {
@@ -90,7 +106,7 @@ class Json_DocumentLoaders implements INode {
             return finaldocs
         }
 
-        return docs
+        return alldocs
     }
 }
 

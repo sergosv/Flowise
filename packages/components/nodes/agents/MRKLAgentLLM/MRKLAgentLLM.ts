@@ -1,12 +1,14 @@
 import { INode, INodeData, INodeParams } from '../../../src/Interface'
 import { initializeAgentExecutorWithOptions, AgentExecutor } from 'langchain/agents'
 import { Tool } from 'langchain/tools'
-import { BaseLLM } from 'langchain/llms/base'
 import { getBaseClasses } from '../../../src/utils'
+import { BaseLanguageModel } from 'langchain/base_language'
+import { flatten } from 'lodash'
 
 class MRKLAgentLLM_Agents implements INode {
     label: string
     name: string
+    version: number
     description: string
     type: string
     icon: string
@@ -17,6 +19,7 @@ class MRKLAgentLLM_Agents implements INode {
     constructor() {
         this.label = 'MRKL Agent for LLMs'
         this.name = 'mrklAgentLLM'
+        this.version = 1.0
         this.type = 'AgentExecutor'
         this.category = 'Agents'
         this.icon = 'agent.svg'
@@ -30,20 +33,21 @@ class MRKLAgentLLM_Agents implements INode {
                 list: true
             },
             {
-                label: 'LLM Model',
+                label: 'Language Model',
                 name: 'model',
-                type: 'BaseLLM'
+                type: 'BaseLanguageModel'
             }
         ]
     }
 
     async init(nodeData: INodeData): Promise<any> {
-        const model = nodeData.inputs?.model as BaseLLM
-        const tools = nodeData.inputs?.tools as Tool[]
+        const model = nodeData.inputs?.model as BaseLanguageModel
+        let tools = nodeData.inputs?.tools as Tool[]
+        tools = flatten(tools)
 
         const executor = await initializeAgentExecutorWithOptions(tools, model, {
             agentType: 'zero-shot-react-description',
-            verbose: true
+            verbose: process.env.DEBUG === 'true' ? true : false
         })
         return executor
     }
